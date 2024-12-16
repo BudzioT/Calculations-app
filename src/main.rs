@@ -60,9 +60,11 @@ fn Company() -> Element {
                     "Aktualne usługi"
                 }
                 ul {
-                    services.iter().map(|service| rsx! {
+                    {
+                        services().iter().map(|service| rsx! {
                         li { "{service}"}
-                    })
+                        })
+                    }
                 }
             }
 

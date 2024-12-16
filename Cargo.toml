@@ -7,7 +7,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-dioxus = { version = "0.6.0", features = ["router", "fullstack", "hooks"] }
+dioxus = { version = "0.6.0-alpha.3", features = ["router", "fullstack", "hooks"] }
+dioxus-liveview = { version = "0.6.0-alpha.3" }
+dioxus-ssr = { version = "0.6.0-alpha.3" }
 
 [features]
 default = ["desktop"]
