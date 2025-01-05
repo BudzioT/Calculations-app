@@ -8,8 +8,6 @@ enum Route {
     Home {},
     #[route("/company")]
     Company {},
-    #[route("/client")]
-    Client {}
 }
 
 const FAVICON: Asset = asset!("/assets/favicon.ico");
@@ -59,6 +57,18 @@ impl Service {
             additional_days,
         }
     }
+
+    fn calculate_price(&self, days: i32, distance: f32, employees: i32) -> f32 {
+        let mut total_price = self.price_per_day * days as f32;
+        total_price += self.tax;
+        if distance > self.travel_limit {
+            total_price += self.travel_additional_price * (distance - self.travel_limit);
+        }
+        if employees > self.employees_limit {
+            total_price += self.additional_days as f32 * self.price_per_day;
+        }
+        total_price
+    }
 }
 
 /// Company page
@@ -66,11 +76,25 @@ impl Service {
 fn Company() -> Element {
     let mut services = use_signal(|| Vec::<Service>::new());
     let mut service = use_signal(|| Service::new(String::new(), 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0));
+    let mut selected_service = use_signal(|| None::<Service>);
+    let mut days = use_signal(|| 0);
+    let mut distance = use_signal(|| 0.0);
+    let mut employees = use_signal(|| 0);
+    let mut total_price = use_signal(|| 0.0);
+    let mut total_price_no_tax = use_signal(|| 0.0);
+    let mut tax = use_signal(|| 0.0);
 
     let add_service = move |_| {
         if !service().name.is_empty() {
             services.push(service());
             service.set(Service::default());
+        }
+    };
+    let calculate_price = move |_| {
+        if let Some(selected_service) = services().first() {
+            total_price.set(selected_service.calculate_price(days(), distance(), employees()));
+            tax.set(total_price() * 0.23 + service().tax);
+            total_price_no_tax.set(total_price() - tax());
         }
     };
 
@@ -271,6 +295,112 @@ fn Company() -> Element {
                 }
             }
         }
+
+        div {
+            div {
+                class: "flex flex flex-col",
+
+                h1 { class: "text-2xl text-center mt-10 mb-5 font-bold","Oszacuj cenę" }
+                div {
+                    class: "mb-5 text-lg gap-x-10 flex flex-wrap justify-center",
+                    div {
+                        h3 {
+                            class: "font-bold",
+                            "Wybierz usługę"
+                        }
+                        select {
+                            class: "text-sm text-black px-1",
+                            onchange: move |e| {
+                                let selected_index = e.value().parse::<usize>().unwrap_or(0);
+                                if let Some(service) = services().get(selected_index) {
+                                    selected_service.set(Some(service.clone()));
+                                }
+                            },
+                            option { value: "", "Wybierz usługę" }
+                            {
+                                services().iter().enumerate().map(|(index, service)| rsx! {
+                                    option { value: "{index}", "{service.name}" }
+                                })
+                            }
+                        }
+                    }
+
+                    div {
+                        h3 {
+                            class: "font-bold",
+                            "Ilość dni"
+                        }
+                        input {
+                            class: "text-sm text-black px-1",
+                            type: "number",
+                            value: days.to_string(),
+                            oninput: move |e| {
+                                if let Ok(d) = e.value().parse::<i32>() {
+                                    days.set(d);
+                                }
+                            },
+                            placeholder: "Ilość dni"
+                        }
+                    }
+
+                    div {
+                    class: "mb-5 text-lg",
+                    h3 {
+                        class: "font-bold",
+                        "Odległość (km)"
+                    }
+                    input {
+                        class: "text-sm text-black px-1",
+                        type: "number",
+                        value: distance.to_string(),
+                        oninput: move |e| {
+                            if let Ok(d) = e.value().parse::<f32>() {
+                                distance.set(d);
+                            }
+                        },
+                        placeholder: "Odległość (km)"
+                        }
+                    }
+
+                    div {
+                    class: "mb-5 text-lg",
+                    h3 {
+                        class: "font-bold",
+                        "Liczba pracowników"
+                    }
+                    input {
+                        class: "text-sm text-black px-1",
+                        type: "number",
+                        value: employees.to_string(),
+                        oninput: move |e| {
+                            if let Ok(e) = e.value().parse::<i32>() {
+                                employees.set(e);
+                            }
+                        },
+                        placeholder: "Liczba pracowników"
+                        }
+                    }
+                }
+
+                button {
+                    class: "bg-gray-500 p-2 rounded-xl text-sm self-center w-40",
+                    onclick: calculate_price,
+                    "Oblicz cenę"
+                }
+                h2 {
+                    class: "text-xl mt-5 text-center",
+                    "Całkowita cena netto: {total_price_no_tax} zł"
+                }
+                h2 {
+                    class: "text-xl mt-5 text-center",
+                    "Całkowity VAT i podatki: {tax} zł"
+                }
+                h2 {
+                    class: "text-xl mt-5 mb-10 text-center",
+                    "Całkowita cena brutto: {total_price} zł"
+                }
+            }
+        }
     }
 }
 
@@ -279,17 +409,8 @@ fn Company() -> Element {
 fn Home() -> Element {
     rsx! {
         div {
+            class: "text-3xl mt-20 text-center",
             h1 { "Program do szacowania ceny usług" }
-        }
-    }
-}
-
-/// Client page
-#[component]
-fn Client() -> Element {
-    rsx! {
-        div {
-            h1 { "Oszacuj cenę" }
         }
     }
 }
@@ -307,10 +428,6 @@ fn Navbar() -> Element {
             Link {
                 to: Route::Company {},
                 "Firma"
-            }
-            Link {
-                to: Route::Client {},
-                "Klient"
             }
         }
 
